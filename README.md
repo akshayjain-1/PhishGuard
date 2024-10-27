@@ -13,7 +13,7 @@ PhishGuard is a Python-based tool to detect phishing emails by analyzing email h
 - **Fake Invoice Detection**: Identifies potential fake invoice scams based on email content.
 - **Comprehensive Reporting**: Generates a detailed report summarizing all findings.
 
-### Prerequisites
+## Prerequisites
 
 Before running the application, ensure you have the following dependencies installed:
 
