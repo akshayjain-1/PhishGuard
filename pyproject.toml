@@ -1,0 +1,24 @@
+[tool.poetry]
+name = "phishguard"
+version = "0.1.0"
+description = "A Python tool to detect phishing emails by analyzing common indiciators present in an email."
+authors = ["Akshay Jain <aj2812@gmail.com>"]
+license = "MIT"
+
+[tool.poetry.dependencies]
+python = "^3.8"
+beautifulsoup4 = "^4.10.0"
+dnspython = "^2.2.1"
+dkimpy = "^1.1.8"
+virustotal-python = "^1.0.0"
+Pillow = "^8.4.0"
+python-docx = "^0.8.11"
+PyMuPDF = "^1.18.19"
+pyzbar = "^0.1.9"
+
+[tool.poetry.dev-dependencies]
+pytest = "^6.2.5"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
