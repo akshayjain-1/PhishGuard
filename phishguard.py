@@ -23,6 +23,7 @@ from virustotal_python import Virustotal as vt
 from pyzbar.pyzbar import decode
 from PIL import Image
 import fitz
+import checkdmarc
 
 # Constants
 VIRUSTOTAL_API_KEY = os.environ.get('VIRUSTOTAL_API_KEY')  # Replace with your actual API key
@@ -42,6 +43,10 @@ PATTERNS = {
 
 
 # Configure logging
+log_file_path = 'email_analyzer.log'
+if os.path.isfile(log_file_path):
+    os.remove(log_file_path)
+
 logging.basicConfig(
     filename='email_analyzer.log',
     level=logging.INFO,
@@ -95,11 +100,13 @@ def _check_spf(domain: str) -> str:
         SPF validation result
     """
     try:
-        answers = dns.resolver.resolve(f'_spf.{domain}', 'TXT')
-        if any('v=spf1' in str(rdata) for rdata in answers):
+        answers = checkdmarc.check_spf(domain)
+        if 'v=spf1' in answers['record'] or answers['valid']:
+            logging.info(f"SPF record is valid.")
             return "SPF record is valid."
-    except dns.resolver.NoAnswer:
-        return "No SPF record found."
+        if not answers['valid']:
+            logging.info(f"No SPF record found.")
+            return "No SPF record found."
     except Exception as e:  # pylint: disable=W0718
         logging.error(f"Error checking SPF for domain '{domain}': {e}")
     return "SPF validation check error."
@@ -115,11 +122,13 @@ def _check_dmarc(domain: str) -> str:
         DMARC validation result
     """
     try:
-        answers = dns.resolver.resolve(f'_dmarc.{domain}', 'TXT')
-        if any('v=DMARC1' in str(rdata) for rdata in answers):
+        answers = checkdmarc.check_dmarc(domain)
+        if 'v=spf1' in answers['record'] or answers['valid']:
+            logging.info(f"DMARC record is valid.")
             return "DMARC record is valid."
-    except dns.resolver.NoAnswer:
-        return "No DMARC record found."
+        if not answers['valid']:
+            logging.info(f"No DMARC record found")
+            return "No DMARC record found."
     except Exception as e:  # pylint: disable=W0718
         logging.error(f"Error checking DMARC for domain '{domain}': {e}")
     return "DMARC validation check error."
@@ -136,13 +145,18 @@ def _validate_dkim(msg) -> str:
     """
     raw_email = msg.as_bytes()
     result = dkim.verify(raw_email)
-    return "DKIM validation passed." if result else "DKIM validation failed."
+    if result:
+        logging.info("DKIM signature is valid.")
+        return "DKIM signature is valid."
+    logging.info("DKIM signature is invalid.")
+    return "DKIM validation failed."
 
 def validate_sender_address(email_from, msg):
     """
     Perform validation of sender's address via spf, dkim and dmarc check
     """
-    domain = email_from.split('@')[-1]
+    from_address = email_from.split('<')[-1].strip().rstrip('>')
+    domain = from_address.split('@')[-1]
     spf_status = _check_spf(domain)
     dmarc_status = _check_dmarc(domain)
     dkim_status = _validate_dkim(msg)
@@ -165,16 +179,24 @@ def analyze_sender_address(headers):
     """
     Analyzes the sender address for common phishing indicators.
     """
+    anomalies = ''
     from_address = headers.get('From', '')
     if not from_address or '@' not in from_address:
         return "Invalid sender address."
 
+    from_address = from_address.split('<')[-1].strip().rstrip('>')
+    
     domain = from_address.split('@')[-1]
+    
+    result = checkdmarc.check_mx(domain)
 
-    if dns.resolver.resolve(domain, 'A'):  # Validate if domain exists
-        return "Sender domain exists and is reachable."
-
-    return "Potentially suspicious sender domain."
+    if result['hosts']:
+        anomalies = "Sender domain exists and has a valid MX record."
+    else:
+        anomalies = "Potentially suspicious sender domain as it doesn't have a MX record."
+    
+    logging.info(f"Sender address: {anomalies}")
+    return anomalies
 
 def analyze_headers_for_anomalies(headers):
     """
@@ -183,6 +205,9 @@ def analyze_headers_for_anomalies(headers):
     anomalies = []
     if headers.get('Reply-To') and headers['Reply-To'] != headers.get('From'):
         anomalies.append("Mismatch between 'Reply-To' and 'From' fields.")
+    
+    if not headers.get('Reply-To'):
+        anomalies.append("Missing 'Reply-To' field.")
 
     if 'X-Priority' in headers and headers['X-Priority'] in ['1', 'High']:
         anomalies.append("Email marked as high priority, could indicate urgency-based phishing.")
@@ -207,38 +232,28 @@ def check_url_with_virustotal(urls):
     Checks a list of URLs with VirusTotal and returns the analysis results.
     """
     results = {}
-    client = vt.Client(VIRUSTOTAL_API_KEY)
+    client = vt(VIRUSTOTAL_API_KEY)
 
-    try:
-        for url in urls:
-            try:
-                analysis = client.get_object(f"/urls/{vt.url_id(url)}")
-                stats = analysis.last_analysis_stats
-                malicious_count = stats.get('malicious', 0)
-
-                # Get the domain creation date
-                creation_date = _get_domain_creation_date(analysis)
-
-                # Check if the domain was recently created
-                if creation_date and _is_recent_domain(creation_date, RECENT_THRESHOLD_DAYS):
-                    verdict = f"URL {url} is suspicious: Domain is newly created - {creation_date}"
-                elif malicious_count > 0:
-                    verdict = f"URL '{url}' is flagged as malicious."
-                else:
-                    verdict = f"URL '{url}' appears safe."
-
-                # Store the result
-                results[url] = verdict
-                logging.info(f"Checked URL: {url}, Verdict: {verdict}")
-
-            except vt.error.APIError as api_err:
-                logging.error(f"API error for URL '{url}': {api_err}")
-                results[url] = f"API error: {api_err}"
-            except Exception as e:  # pylint: disable=W0718
-                logging.exception(f"Unexpected error for URL '{url}': {e}")
-                results[url] = "Unexpected error occurred."
-    finally:
-        client.close()
+    for url in urls:
+        try:
+            analysis = client.get_object(f"/urls/{vt.url_id(url)}")
+            stats = analysis.last_analysis_stats
+            malicious_count = stats.get('malicious', 0)
+            # Get the domain creation date
+            creation_date = _get_domain_creation_date(analysis)
+            # Check if the domain was recently created
+            if creation_date and _is_recent_domain(creation_date, RECENT_THRESHOLD_DAYS):
+                verdict = f"URL {url} is suspicious: Domain is newly created - {creation_date}"
+            elif malicious_count > 0:
+                verdict = f"URL '{url}' is flagged as malicious."
+            else:
+                verdict = f"URL '{url}' appears safe."
+            # Store the result
+            results[url] = verdict
+            logging.info(f"Checked URL: {url}, Verdict: {verdict}")
+        except Exception as e:  # pylint: disable=W0718
+            logging.exception(f"Unexpected error for URL '{url}': {e}")
+            results[url] = f"Unexpected error occurred. {e}"
 
     return results
 
@@ -320,7 +335,7 @@ def check_file_hash_in_virustotal(file_hash):
     """
     Checkc the file hash for analysis in Virustotal
     """
-    client = vt.Client(VIRUSTOTAL_API_KEY)
+    client = vt(VIRUSTOTAL_API_KEY)
 
     try:
         analysis = client.get_object(f"/files/{file_hash}")
@@ -328,20 +343,15 @@ def check_file_hash_in_virustotal(file_hash):
         malicious_count = stats.get('malicious', 0)
 
         return malicious_count
-    except vt.error.APIError as api_error:
-        logging.exception(f"Unexpected error while querying VirusTotal: {api_error}")
-        return None
     except Exception as e:  # pylint: disable=W0718
         logging.exception(f"Unexpected error while querying VirusTotal: {e}")
         return None
-    finally:
-        client.close()
 
 def submit_file_to_virustotal(file_path):
     """
     Submits a file to Virustotal for analysis
     """
-    client = vt.Client(VIRUSTOTAL_API_KEY)
+    client = vt(VIRUSTOTAL_API_KEY)
 
     try:
         with open(file_path, "rb") as f:
@@ -358,12 +368,8 @@ def submit_file_to_virustotal(file_path):
             logging.info(f"File '{os.path.basename(file_path)}' appears clean.")
             return 0
 
-    except vt.error.APIError as api_err:
-        logging.error(f"VirusTotal API error: {api_err}")
     except Exception as e:  # pylint: disable=W0718
         logging.exception(f"Unexpected error while submitting file: {e}")
-    finally:
-        client.close()
 
 def _wait_for_analysis_completion(client, analysis_id, interval=15, max_retries=10):
     """
