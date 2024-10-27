@@ -1,0 +1,40 @@
+
+# Email Analysis Report
+## Warning
+This report is not 100% accurate and should only be used as a guideline.
+It is recommended to manually review the email and its contents to ensure accuracy.
+
+## Summary
+  ###Sender address Validation results
+        - SPF record is valid.
+        - DMARC record is valid.
+        - DKIM validation failed.
+
+  ###Sender email analysis
+        - Sender domain exists and has a valid MX record.
+
+  ###Header Analysis
+     The following anomalies were found in the email headers: 
+            - Missing 'Reply-To' field.
+
+  ###URL Analysis
+     The URLs are safe or no URLs were found in the email body.
+
+  ###Attachment Hash Analysis
+     The attachment's hash is not considered malicious.
+
+  ###Attachment Analysis
+     The following is the analysis for the attachments.
+        - extracted_attachments/T9J6NK609JWFD2XMW0DC.pdf: malicious_score - 0
+
+  ###QR Code URL Analysis
+     No QR Code URLs were found in the email body.
+
+  ###Sender Spoofing
+     **Possible Sender Spoofing Detected**: The sender's email address may be spoofed.
+
+  ###Phishing Indicators
+     **Phishing Indicators Found**: The email text contains indicators of phishing.
+
+  ###Fake Invoice
+     **Fake Invoice Detected**: The email appears to be a fake invoice scam.

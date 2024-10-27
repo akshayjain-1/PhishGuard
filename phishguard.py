@@ -6,6 +6,7 @@ Program to detect phishing emails
 from asyncio import sleep
 from datetime import datetime
 import email
+from email.utils import parseaddr
 import hashlib
 import os
 import re
@@ -19,7 +20,7 @@ from docx import Document
 from bs4 import BeautifulSoup
 import dns.resolver
 import dkim
-from virustotal_python import Virustotal as vt
+import vt
 from pyzbar.pyzbar import decode
 from PIL import Image
 import fitz
@@ -232,28 +233,28 @@ def check_url_with_virustotal(urls):
     Checks a list of URLs with VirusTotal and returns the analysis results.
     """
     results = {}
-    client = vt(VIRUSTOTAL_API_KEY)
-
-    for url in urls:
-        try:
-            analysis = client.get_object(f"/urls/{vt.url_id(url)}")
-            stats = analysis.last_analysis_stats
-            malicious_count = stats.get('malicious', 0)
-            # Get the domain creation date
-            creation_date = _get_domain_creation_date(analysis)
-            # Check if the domain was recently created
-            if creation_date and _is_recent_domain(creation_date, RECENT_THRESHOLD_DAYS):
-                verdict = f"URL {url} is suspicious: Domain is newly created - {creation_date}"
-            elif malicious_count > 0:
-                verdict = f"URL '{url}' is flagged as malicious."
-            else:
-                verdict = f"URL '{url}' appears safe."
-            # Store the result
-            results[url] = verdict
-            logging.info(f"Checked URL: {url}, Verdict: {verdict}")
-        except Exception as e:  # pylint: disable=W0718
-            logging.exception(f"Unexpected error for URL '{url}': {e}")
-            results[url] = f"Unexpected error occurred. {e}"
+    
+    with vt.Client(VIRUSTOTAL_API_KEY) as client:
+        for url in urls:
+            try:
+                analysis = client.get_object(f"/urls/{vt.url_id(url)}")
+                stats = analysis.last_analysis_stats
+                malicious_count = stats.get('malicious', 0)
+                # Get the domain creation date
+                creation_date = _get_domain_creation_date(analysis)
+                # Check if the domain was recently created
+                if creation_date and _is_recent_domain(creation_date, RECENT_THRESHOLD_DAYS):
+                    verdict = f"URL {url} is suspicious: Domain is newly created - {creation_date}"
+                elif malicious_count > 0:
+                    verdict = f"URL '{url}' is flagged as malicious."
+                else:
+                    verdict = f"URL '{url}' appears safe."
+                # Store the result
+                results[url] = verdict
+                logging.info(f"Checked URL: {url}, Verdict: {verdict}")
+            except Exception as e:  # pylint: disable=W0718
+                logging.exception(f"Unexpected error for URL '{url}': {e}")
+                results[url] = f"Unexpected error occurred. {e}"
 
     return results
 
@@ -335,63 +336,41 @@ def check_file_hash_in_virustotal(file_hash):
     """
     Checkc the file hash for analysis in Virustotal
     """
-    client = vt(VIRUSTOTAL_API_KEY)
+    with vt.Client(VIRUSTOTAL_API_KEY) as client:
+        try:
+            analysis = client.get_object(f"/files/{file_hash}")
+            stats = analysis.last_analysis_stats
+            malicious_count = stats.get('malicious', 0)
 
-    try:
-        analysis = client.get_object(f"/files/{file_hash}")
-        stats = analysis.last_analysis_stats
-        malicious_count = stats.get('malicious', 0)
-
-        return malicious_count
-    except Exception as e:  # pylint: disable=W0718
-        logging.exception(f"Unexpected error while querying VirusTotal: {e}")
-        return None
+            logging.info(f"Hash analysis results: {stats}")
+            return malicious_count
+        except Exception as e:  # pylint: disable=W0718
+            logging.exception(f"Unexpected error while querying VirusTotal: {e}")
+            return None
 
 def submit_file_to_virustotal(file_path):
     """
     Submits a file to Virustotal for analysis
     """
-    client = vt(VIRUSTOTAL_API_KEY)
+    with vt.Client(VIRUSTOTAL_API_KEY) as client:
+        try:
+            with open(file_path, "rb") as f:
+                analysis = client.scan_file(f,wait_for_completion=True)
+                analysis_id = analysis.id
+                logging.info(f"File '{os.path.basename(file_path)}' submitted successfully with ID: {analysis_id}")
 
-    try:
-        with open(file_path, "rb") as f:
-            analysis = client.scan_file(f)
-            analysis_id = analysis.id
-            logging.info(f"File '{os.path.basename(file_path)}' submitted successfully with ID: {analysis_id}")
+            analysis_results = analysis.stats
+            logging.info(f"Analysis completed with stats: {analysis.stats}")
+            
+            if analysis_results['malicious'] > 0:
+                logging.warning(f"File '{os.path.basename(file_path)}' is flagged as malicious!")
+                return analysis_results['malicious']
+            else:
+                logging.info(f"File '{os.path.basename(file_path)}' appears clean.")
+                return 0
 
-        analysis_results = _wait_for_analysis_completion(client, analysis_id)
-
-        if analysis_results['malicious'] > 0:
-            logging.warning(f"File '{os.path.basename(file_path)}' is flagged as malicious!")
-            return analysis_results['malicious']
-        else:
-            logging.info(f"File '{os.path.basename(file_path)}' appears clean.")
-            return 0
-
-    except Exception as e:  # pylint: disable=W0718
-        logging.exception(f"Unexpected error while submitting file: {e}")
-
-def _wait_for_analysis_completion(client, analysis_id, interval=15, max_retries=10):
-    """
-    Polls VirusTotal at regular intervals to wait for the analysis to complete.
-    Returns the analysis statistics when done.
-    """
-    retries=0
-    while retries < max_retries:
-        analysis = client.get_object(f"/analyses/{analysis_id}")
-
-        if analysis.status == "completed":
-            stats = analysis.stats  # Retrieve the analysis stats
-            logging.info(f"Analysis completed with stats: {stats}")
-            return stats  # Return the stats for further processing
-
-        # Wait before polling again
-        logging.info("Analysis still in progress... waiting.")
-        sleep(interval)
-        retries += 1
-
-    logging.warning(f"Analysis not completed after {max_retries * interval} seconds.")
-    return {"malicious": 0, "undetected": 0, "suspicious": 0}
+        except Exception as e:  # pylint: disable=W0718
+            logging.exception(f"Unexpected error while submitting file: {e}")
 
 def parse_email_for_qrcode(file_path):
     """
@@ -480,12 +459,14 @@ def _extract_qr_code_from_docx(doc_data):
 
 def _detect_fake_invoice(email_body, sender_email):
     """Detect if the email mentions a brand but the sender domain doesn't match."""
+    sender_email = sender_email.split('<')[-1].strip().rstrip('>')
     email_domain = sender_email.split('@')[-1].lower()
     for brand in KNOWN_BRANDS:
         if brand in email_body.lower() and brand not in email_domain:
             logging.warning(f"Possible Fake Invoice scam detected: Brand '{brand}' mentioned in email, but sent from {email_domain}")
             return f"Possible Fake Invoice scam detected: Brand '{brand}' mentioned in email, but sent from {email_domain}"
-    return None
+    logging.info("Possible Fake Invoice scam not detected.")
+    return "Possible Fake Invoice scam not detected."
 
 def _extract_pdf_text(pdf_data):
     """Extract text from a PDF attachment."""
@@ -510,21 +491,31 @@ def _extract_docx_text(doc_data):
         logging.error(f"Error extracting text from DOCX: {e}")
         return ""
 
-def check_sender_spoofing(sender_name, sender_email):
+def check_sender_spoofing(sender_email):
     """Check for sender spoofing by comparing the sender's name and email address."""
-    expected_name = sender_email.split('@')[0].replace('.', ' ').title()
-    return sender_name.lower() not in expected_name.lower()
+    name, email = parseaddr(sender_email)
+    
+    # Normalize by lowercasing both the name and email for comparison
+    name_parts = re.findall(r'\w+', name.lower())  # Extract individual words from the name
+    email_username = email.split('@')[0].lower()   # Extract username part of the email
+    
+    name_in_email = any(part in email_username for part in name_parts)
+    
+    return name_in_email
 
 def _find_phishing_indicators(text):
     """Detect phishing keywords and pattern matches in the provided text."""
     detected_keywords = [kw for kw in PHISHING_KEYWORDS if kw in text.lower()]
     pattern_matches = {name: re.findall(pattern, text) for name, pattern in PATTERNS.items()}
-    return detected_keywords, pattern_matches
-
+    if detected_keywords:
+        logging.info(f"Possible Phishing indicators found: {detected_keywords}")
+    else:
+        logging.info("No phishing indicators found for the specific set of keywords.")
+    return detected_keywords
 def get_email_and_attachment_text(msg):
     """Extract email body and attachment text from a parsed email message."""
-    fake_invoice_found = False
-    phishing_indicators_found = False
+    fake_invoice_found = ''
+    phishing_indicators_found = []
 
     for part in msg.walk():
         if part.get_content_disposition() == 'attachment':
@@ -535,104 +526,106 @@ def get_email_and_attachment_text(msg):
             if filename.endswith('.pdf'):
                 pdf_data = part.get_payload(decode=True)
                 pdf_text = _extract_pdf_text(pdf_data)
-                fake_invoice_found |= _detect_fake_invoice(pdf_text, msg.get('From'))
-                phishing_indicators_found |= _find_phishing_indicators(pdf_text)
+                fake_invoice_found = _detect_fake_invoice(pdf_text, msg.get('From'))
+                phishing_indicators_found = _find_phishing_indicators(pdf_text)
 
             elif filename.endswith(('.docx', '.doc')):
                 doc_data = part.get_payload(decode=True)
                 doc_text = _extract_docx_text(doc_data)
-                fake_invoice_found |= _detect_fake_invoice(doc_text, msg.get('From'))
-                phishing_indicators_found |= _find_phishing_indicators(doc_text)
+                fake_invoice_found = _detect_fake_invoice(doc_text, msg.get('From'))
+                phishing_indicators_found = _find_phishing_indicators(doc_text)
 
 
     if msg.is_multipart():
         for part in msg.walk():
             if part.get_content_type() == 'text/plain':
                 email_text = part.get_payload(decode=True).decode()
-                fake_invoice_found |= _detect_fake_invoice(email_text, msg.get('From'))
-                phishing_indicators_found |= _find_phishing_indicators(email_text)
+                fake_invoice_found = _detect_fake_invoice(email_text, msg.get('From'))
+                phishing_indicators_found = _find_phishing_indicators(email_text)
     else:
         email_text = msg.get_payload(decode=True).decode()
-        fake_invoice_found |= _detect_fake_invoice(email_text, msg.get('From'))
-        phishing_indicators_found |= _find_phishing_indicators(email_text)
+        fake_invoice_found = _detect_fake_invoice(email_text, msg.get('From'))
+        phishing_indicators_found = _find_phishing_indicators(email_text)
     return phishing_indicators_found, fake_invoice_found
 
-def generate_final_report(phishing_indicators_found, fake_invoice_found, sender_spoofing,
+def generate_final_report(phishing_indicators_found, fake_invoice_found, name_in_email,
                     qr_url_analysis, attachment_analysis, url_analysis, sender_analysis,
                     header_anomalies, dkim_status, dmarc_status, spf_status, is_malicious):
     """
     Generates a final report summarizing the findings of the email analysis.
     """
     report = """
-    # Email Analysis Report
-    ## Warning
-    This report is not 100% accurate and should only be used as a guideline.
-    It is recommended to manually review the email and its contents to ensure accuracy.
-    
-    ## Summary"""
+# Email Analysis Report
+## Warning
+This report is not 100% accurate and should only be used as a guideline.
+It is recommended to manually review the email and its contents to ensure accuracy.
 
-    report += "- **Sender address Validation results**"
-    report += spf_status
-    report += dmarc_status
-    report += dkim_status
+## Summary\n"""
 
-    report += "- **Sender email analysis**"
-    report += sender_analysis
+    report += "  ###Sender address Validation results\n"
+    report += f"        - {spf_status}\n"
+    report += f"        - {dmarc_status}\n"
+    report += f"        - {dkim_status}\n\n"
 
-    report += "- **Header Analysis**"
+    report += "  ###Sender email analysis\n"
+    report += f"        - {sender_analysis}\n\n"
+
+    report += "  ###Header Analysis\n"
     if header_anomalies:
-        report += "THe following anomalies were found in the email headers: \n"
+        report += "     The following anomalies were found in the email headers: \n"
         for anomaly in header_anomalies:
-            report += f"    - {anomaly}\n"
+            report += f"            - {anomaly}\n"
     else:
-        report += "No anomalies were found in the email headers.\n"
+        report += "     No anomalies were found in the email headers.\n"
 
-    report += "- **URL Analysis**"
+    report += "\n  ###URL Analysis\n"
     if url_analysis:
-        report += "The following URLs were found in the email body and the results are: \n"
+        report += "     The following URLs were found in the email body and the results are: \n"
         for url, result in url_analysis.items():
-            report += f"    - {url}: {result}\n"
+            report += f"        - {url}: {result}\n"
     else:
-        report += "No URLs were found in the email body.\n"
+        report += "     The URLs are safe or no URLs were found in the email body.\n"
 
 
-    report += "- **Attachment Hash Analysis**"
+    report += "\n  ###Attachment Hash Analysis\n"
     if is_malicious:
-        report += "The attachment's hash is considered malicious.\n"
+        report += "     The attachment's hash is considered malicious.\n"
     else:
-        report += "The attachment's hash is not considered malicious.\n"
+        report += "     The attachment's hash is not considered malicious.\n"
 
-    report += "- **Attachment Analysis**"
+    report += "\n  ###Attachment Analysis\n"
     if attachment_analysis:
-        report += "The following attachments are considered malicious.\n"
+        report += "     The following is the analysis for the attachments.\n"
         for attachment, verdict in attachment_analysis.items():
-            report += f"    - {attachment}: {verdict}\n"
+            report += f"        - {attachment}: malicious_score - {verdict}\n"
     else:
-        report += "The attachment's hash is not considered malicious.\n"
+        report += "     The attachment is not considered malicious or no attachments are present in the email\n"
 
-    report += "- **QR Code URL Analysis**"
+    report += "\n  ###QR Code URL Analysis\n"
     if qr_url_analysis:
-        report += "The QR Code URLs have been analyzed and the results are: \n"
+        report += "     The QR Code URLs have been analyzed and the results are: \n"
         for url, result in qr_url_analysis.items():
-            report += f"    - {url}: {result}\n"
-
-    report += "- **Sender Spoofing**"
-    if sender_spoofing:
-        report += "- **Sender Spoofing Detected**: The sender's email address may be spoofed.\n"
+            report += f"       - {url}: {result}\n"
     else:
-        report += "- **No Sender Spoofing Detected**: The sender's email address appears to be legitimate.\n"
+        report += "     No QR Code URLs were found in the email body.\n"
 
-    report += "- **Phishing Indicators**"
+    report += "\n  ###Sender Spoofing\n"
+    if name_in_email:
+        report += "     **No Sender Spoofing Detected**: The sender's email address appears to be legitimate.\n"
+    else:
+        report += "     **Possible Sender Spoofing Detected**: The sender's email address may be spoofed.\n"
+
+    report += "\n  ###Phishing Indicators\n"
     if phishing_indicators_found:
-        report += "- **Phishing Indicators Found**: The email text contains indicators of phishing.\n"
+        report += "     **Phishing Indicators Found**: The email text contains indicators of phishing.\n"
     else:
-        report += "- **No Phishing Indicators Found**: The email text does not contain indicators of phishing.\n"
+        report += "     **No Phishing Indicators Found**: The email text does not contain indicators of phishing.\n"
 
-    report += "- **Fake Invoice**"
+    report += "\n  ###Fake Invoice\n"
     if fake_invoice_found:
-        report += "- **Fake Invoice Detected**: The email appears to be a fake invoice scam.\n"
+        report += "     **Fake Invoice Detected**: The email appears to be a fake invoice scam.\n"
     else:
-        report += "- **No Fake Invoice Detected**: The email does not appear to be a fake invoice scam.\n"
+        report += "     **No Fake Invoice Detected**: The email does not appear to be a fake invoice scam.\n"
 
     return report
 
@@ -671,44 +664,50 @@ def main():
 
     if not attachments:
         logging.info("No attachments found in the EML file.")
-        return 0
 
-    attachment_analysis = {}
-    for attachment in attachments:
-        file_hash = hash_file(attachment)
-        if not file_hash:
-            logging.error(f"Could not calculate hash for '{attachment}'. Skipping...")
-            continue
+    else:
+        attachment_analysis = {}
+        for attachment in attachments:
+            file_hash = hash_file(attachment)
+            if not file_hash:
+                logging.error(f"Could not calculate hash for '{attachment}'. Skipping...")
+                continue
 
-        is_malicious = check_file_hash_in_virustotal(file_hash)
+            is_malicious = check_file_hash_in_virustotal(file_hash)
 
-        if not is_malicious:
-            logging.info(f"Submitting '{attachment}' for dynamic analysis...")
-            attachment_analysis[attachment] = submit_file_to_virustotal(attachment)
+            if not is_malicious:
+                logging.info(f"Submitting '{attachment}' for dynamic analysis...")
+                attachment_analysis[attachment] = submit_file_to_virustotal(attachment)
 
     # Qr code detection and analysis
     qr_urls = parse_email_for_qrcode(file_path)
 
     if not qr_urls:
         logging.info("No QR codes found in the email.")
-        return
+        qr_url_analysis = None
 
-    qr_url_analysis = check_url_with_virustotal(qr_urls)
+    else:
+        qr_url_analysis = check_url_with_virustotal(qr_urls)
 
     # Sender spoofing detection
     sender_email = msg.get('From')
-    sender_name = sender_email.split('<')[0].strip() if '<' in sender_email else sender_email
-
-    sender_spoofing = check_sender_spoofing(sender_name, sender_email)
+    name_in_email = check_sender_spoofing(sender_email)
 
     # Email and attachment text analysis
     phishing_indicators_found, fake_invoice_found = get_email_and_attachment_text(msg)
 
-    report = generate_final_report(phishing_indicators_found, fake_invoice_found, sender_spoofing,
+    report = generate_final_report(phishing_indicators_found, fake_invoice_found, name_in_email,
                     qr_url_analysis, attachment_analysis, url_analysis, sender_analysis,
                     header_anomalies, dkim_status, dmarc_status, spf_status, is_malicious)
 
-    print(report)
+    report_file_path = "email_analysis_report.txt"
+    if os.path.isfile(report_file_path):
+        os.remove(report_file_path)
+    
+    with open(report_file_path, "w") as report_file:
+        report_file.write(report)
+
+    print(f"Report written to {report_file_path}")
 
 if __name__ == "__main__":
     main()

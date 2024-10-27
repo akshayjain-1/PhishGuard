@@ -11,7 +11,7 @@ PhishGuard is a Python-based tool to detect phishing emails by analyzing email h
 - **Attachment Analysis**: Checks for attachments, hashes them, and analyzes their content using VirusTotal.
 - **QR Code Detection**: Scans for QR codes in the email body and attachments, extracting any URLs present.
 - **Fake Invoice Detection**: Identifies potential fake invoice scams based on email content.
-- **Comprehensive Reporting**: Generates a detailed report summarizing all findings.
+- **Comprehensive Reporting**: Generates a detailed report summarizing all findings. After the analysis is complete, check the `email_analysis_report.txt` file for the detailed report.
 
 ## Prerequisites
 

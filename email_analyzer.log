@@ -1,0 +1,19 @@
+2024-10-27 13:22:03,888 - INFO - SPF record is valid.
+2024-10-27 13:22:06,108 - INFO - DMARC record is valid.
+2024-10-27 13:22:06,111 - INFO - DKIM signature is invalid.
+2024-10-27 13:22:06,113 - INFO - Extracted email headers.
+2024-10-27 13:22:34,429 - INFO - Sender address: Sender domain exists and has a valid MX record.
+2024-10-27 13:22:34,430 - INFO - Header Anomalies: ["Missing 'Reply-To' field."]
+2024-10-27 13:22:34,435 - INFO - Extracted URLs: []
+2024-10-27 13:22:34,439 - INFO - Saved attachment: extracted_attachments/T9J6NK609JWFD2XMW0DC.pdf
+2024-10-27 13:22:34,823 - INFO - Hash analysis results: {'malicious': 0, 'suspicious': 0, 'undetected': 65, 'harmless': 0, 'timeout': 0, 'confirmed-timeout': 0, 'failure': 0, 'type-unsupported': 12}
+2024-10-27 13:22:34,824 - INFO - Submitting 'extracted_attachments/T9J6NK609JWFD2XMW0DC.pdf' for dynamic analysis...
+2024-10-27 13:22:36,446 - INFO - File 'T9J6NK609JWFD2XMW0DC.pdf' submitted successfully with ID: MTdkMzkxOTEwOWJlZTY4YWRlNjdhNTJjODdmOTc3MTM6MTczMDA0OTQxNA==
+2024-10-27 13:22:36,447 - INFO - Analysis completed with stats: {'malicious': 0, 'suspicious': 0, 'undetected': 65, 'harmless': 0, 'timeout': 0, 'confirmed-timeout': 0, 'failure': 0, 'type-unsupported': 12}
+2024-10-27 13:22:36,447 - INFO - File 'T9J6NK609JWFD2XMW0DC.pdf' appears clean.
+2024-10-27 13:22:36,485 - INFO - No QR codes found in the email.
+2024-10-27 13:22:36,486 - INFO - Found attachment: T9J6NK609JWFD2XMW0DC.pdf
+2024-10-27 13:22:36,487 - INFO - Possible Fake Invoice scam not detected.
+2024-10-27 13:22:36,487 - INFO - No phishing indicators found for the specific set of keywords.
+2024-10-27 13:22:36,488 - INFO - Possible Fake Invoice scam not detected.
+2024-10-27 13:22:36,488 - INFO - Possible Phishing indicators found: ['purchase']
