@@ -57,6 +57,9 @@ Before running the application, ensure you have the following dependencies insta
 ## Usage
 ```poetry run python phishguard.py ```
 1. Follow the prompts to provide the full path of the saved email file.
+2. Sample input method:
+![alt text](image.png)
+Note: Do not enter the file path in quotes
 
 ## Output
 
@@ -70,6 +73,11 @@ The program will generate a detailed report summarizing the analysis results, in
 
 ## Logging
 All activities and errors are logged to `email_analyzer.log` for further investigation.
+
+## Future Work
+- Improve detection mechanisms for identifying sender spoofing and fake invoice scams
+- Enhance QR code analysis to detect more sophisticated phishing attempts
+- Add more features for detecting phishing emails
 
 ## Contributing
 Contributions are welcome! Please feel free to submit a pull request or open an issue for any suggestions or improvements.

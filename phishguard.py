@@ -72,12 +72,6 @@ def how_to_save_email() -> None:
 def parse_email(file_path: str):
     """
     Function to parse email
-    
-    Args:
-        file_path: Path to the email file
-
-    Returns:
-        Email message or None if an error occurred
     """
     try:
         with open(file_path, 'rb') as f:
@@ -93,12 +87,6 @@ def parse_email(file_path: str):
 def _check_spf(domain: str) -> str:
     """
     Function to check spf
-    
-    Args:
-        domain: Domain to check
-
-    Returns:
-        SPF validation result
     """
     try:
         answers = checkdmarc.check_spf(domain)
@@ -115,12 +103,6 @@ def _check_spf(domain: str) -> str:
 def _check_dmarc(domain: str) -> str:
     """
     Function to check dmarc
-    
-    Args:
-        domain: Domain to check
-
-    Returns:
-        DMARC validation result
     """
     try:
         answers = checkdmarc.check_dmarc(domain)
@@ -137,12 +119,6 @@ def _check_dmarc(domain: str) -> str:
 def _validate_dkim(msg) -> str:
     """
     Validate DKIM signature of the email.
-    
-    Args:
-        msg: Parsed email message
-
-    Returns:
-        DKIM validation result
     """
     raw_email = msg.as_bytes()
     result = dkim.verify(raw_email)
@@ -613,7 +589,7 @@ It is recommended to manually review the email and its contents to ensure accura
     if name_in_email:
         report += "     **No Sender Spoofing Detected**: The sender's email address appears to be legitimate.\n"
     else:
-        report += "     **Possible Sender Spoofing Detected**: The sender's email address may be spoofed.\n"
+        report += "     **Possible Sender Spoofing Detected**: The sender's email address MAY be spoofed OR sender name is not present in email\n"
 
     report += "\n  ###Phishing Indicators\n"
     if phishing_indicators_found:
@@ -622,10 +598,7 @@ It is recommended to manually review the email and its contents to ensure accura
         report += "     **No Phishing Indicators Found**: The email text does not contain indicators of phishing.\n"
 
     report += "\n  ###Fake Invoice\n"
-    if fake_invoice_found:
-        report += "     **Fake Invoice Detected**: The email appears to be a fake invoice scam.\n"
-    else:
-        report += "     **No Fake Invoice Detected**: The email does not appear to be a fake invoice scam.\n"
+    report += f"     {fake_invoice_found}\n"
 
     return report
 
@@ -661,12 +634,13 @@ def main():
 
     # Attachment analysis
     attachments = check_email_for_attachment(file_path)
-
+    attachment_analysis = {}
+    is_malicious = None
+    
     if not attachments:
         logging.info("No attachments found in the EML file.")
 
     else:
-        attachment_analysis = {}
         for attachment in attachments:
             file_hash = hash_file(attachment)
             if not file_hash:

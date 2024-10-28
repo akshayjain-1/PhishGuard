@@ -25,16 +25,17 @@ It is recommended to manually review the email and its contents to ensure accura
 
   ###Attachment Analysis
      The following is the analysis for the attachments.
-        - extracted_attachments/T9J6NK609JWFD2XMW0DC.pdf: malicious_score - 0
+        - extracted_attachments/2024-10-28 18_38_13-QR Code Generator _ Create Your Free QR Codes.png: malicious_score - 0
 
   ###QR Code URL Analysis
-     No QR Code URLs were found in the email body.
+     The QR Code URLs have been analyzed and the results are: 
+       - https://www.cybersecurityhub101.com/: URL 'https://www.cybersecurityhub101.com/' appears safe.
 
   ###Sender Spoofing
-     **Possible Sender Spoofing Detected**: The sender's email address may be spoofed.
+     **Possible Sender Spoofing Detected**: The sender's email address may be spoofed. OR sender name is not present in email
 
   ###Phishing Indicators
-     **Phishing Indicators Found**: The email text contains indicators of phishing.
+     **No Phishing Indicators Found**: The email text does not contain indicators of phishing.
 
   ###Fake Invoice
-     **Fake Invoice Detected**: The email appears to be a fake invoice scam.
+     Possible Fake Invoice scam not detected.

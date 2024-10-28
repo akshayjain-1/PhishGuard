@@ -1,19 +1,36 @@
-2024-10-27 13:22:03,888 - INFO - SPF record is valid.
-2024-10-27 13:22:06,108 - INFO - DMARC record is valid.
-2024-10-27 13:22:06,111 - INFO - DKIM signature is invalid.
-2024-10-27 13:22:06,113 - INFO - Extracted email headers.
-2024-10-27 13:22:34,429 - INFO - Sender address: Sender domain exists and has a valid MX record.
-2024-10-27 13:22:34,430 - INFO - Header Anomalies: ["Missing 'Reply-To' field."]
-2024-10-27 13:22:34,435 - INFO - Extracted URLs: []
-2024-10-27 13:22:34,439 - INFO - Saved attachment: extracted_attachments/T9J6NK609JWFD2XMW0DC.pdf
-2024-10-27 13:22:34,823 - INFO - Hash analysis results: {'malicious': 0, 'suspicious': 0, 'undetected': 65, 'harmless': 0, 'timeout': 0, 'confirmed-timeout': 0, 'failure': 0, 'type-unsupported': 12}
-2024-10-27 13:22:34,824 - INFO - Submitting 'extracted_attachments/T9J6NK609JWFD2XMW0DC.pdf' for dynamic analysis...
-2024-10-27 13:22:36,446 - INFO - File 'T9J6NK609JWFD2XMW0DC.pdf' submitted successfully with ID: MTdkMzkxOTEwOWJlZTY4YWRlNjdhNTJjODdmOTc3MTM6MTczMDA0OTQxNA==
-2024-10-27 13:22:36,447 - INFO - Analysis completed with stats: {'malicious': 0, 'suspicious': 0, 'undetected': 65, 'harmless': 0, 'timeout': 0, 'confirmed-timeout': 0, 'failure': 0, 'type-unsupported': 12}
-2024-10-27 13:22:36,447 - INFO - File 'T9J6NK609JWFD2XMW0DC.pdf' appears clean.
-2024-10-27 13:22:36,485 - INFO - No QR codes found in the email.
-2024-10-27 13:22:36,486 - INFO - Found attachment: T9J6NK609JWFD2XMW0DC.pdf
-2024-10-27 13:22:36,487 - INFO - Possible Fake Invoice scam not detected.
-2024-10-27 13:22:36,487 - INFO - No phishing indicators found for the specific set of keywords.
-2024-10-27 13:22:36,488 - INFO - Possible Fake Invoice scam not detected.
-2024-10-27 13:22:36,488 - INFO - Possible Phishing indicators found: ['purchase']
+2024-10-28 18:39:38,133 - INFO - SPF record is valid.
+2024-10-28 18:39:40,383 - INFO - DMARC record is valid.
+2024-10-28 18:39:40,386 - INFO - DKIM signature is invalid.
+2024-10-28 18:39:40,386 - INFO - Extracted email headers.
+2024-10-28 18:40:08,187 - INFO - Sender address: Sender domain exists and has a valid MX record.
+2024-10-28 18:40:08,187 - INFO - Header Anomalies: ["Missing 'Reply-To' field."]
+2024-10-28 18:40:08,198 - INFO - Extracted URLs: []
+2024-10-28 18:40:08,204 - INFO - Saved attachment: extracted_attachments/2024-10-28 18_38_13-QR Code Generator _ Create Your Free QR Codes.png
+2024-10-28 18:40:08,633 - ERROR - Unexpected error while querying VirusTotal: ('NotFoundError', 'File "e78063b8891e97e8bf3025f1df89269e" not found')
+Traceback (most recent call last):
+  File "/home/akshay/Python/PhishGuard/phishguard.py", line 341, in check_file_hash_in_virustotal
+    analysis = client.get_object(f"/files/{file_hash}")
+  File "/home/akshay/.cache/pypoetry/virtualenvs/phishguard-x6sVY0b9-py3.10/lib/python3.10/site-packages/vt/client.py", line 659, in get_object
+    return make_sync(self.get_object_async(path, *path_args, params=params))
+  File "/home/akshay/.cache/pypoetry/virtualenvs/phishguard-x6sVY0b9-py3.10/lib/python3.10/site-packages/vt/utils.py", line 27, in make_sync
+    return event_loop.run_until_complete(future)
+  File "/usr/lib/python3.10/asyncio/base_events.py", line 649, in run_until_complete
+    return future.result()
+  File "/home/akshay/.cache/pypoetry/virtualenvs/phishguard-x6sVY0b9-py3.10/lib/python3.10/site-packages/vt/client.py", line 669, in get_object_async
+    return await self._response_to_object(response)
+  File "/home/akshay/.cache/pypoetry/virtualenvs/phishguard-x6sVY0b9-py3.10/lib/python3.10/site-packages/vt/client.py", line 310, in _response_to_object
+    json_response = await self._response_to_json(response)
+  File "/home/akshay/.cache/pypoetry/virtualenvs/phishguard-x6sVY0b9-py3.10/lib/python3.10/site-packages/vt/client.py", line 306, in _response_to_json
+    raise error
+vt.error.APIError: ('NotFoundError', 'File "e78063b8891e97e8bf3025f1df89269e" not found')
+2024-10-28 18:40:08,634 - INFO - Submitting 'extracted_attachments/2024-10-28 18_38_13-QR Code Generator _ Create Your Free QR Codes.png' for dynamic analysis...
+2024-10-28 18:41:12,527 - INFO - File '2024-10-28 18_38_13-QR Code Generator _ Create Your Free QR Codes.png' submitted successfully with ID: ZTc4MDYzYjg4OTFlOTdlOGJmMzAyNWYxZGY4OTI2OWU6MTczMDE1NTIxMA==
+2024-10-28 18:41:12,527 - INFO - Analysis completed with stats: {'malicious': 0, 'suspicious': 0, 'undetected': 62, 'harmless': 0, 'timeout': 0, 'confirmed-timeout': 0, 'failure': 0, 'type-unsupported': 14}
+2024-10-28 18:41:12,527 - INFO - File '2024-10-28 18_38_13-QR Code Generator _ Create Your Free QR Codes.png' appears clean.
+2024-10-28 18:41:12,552 - INFO - QR Code detected with URL: https://www.cybersecurityhub101.com/
+2024-10-28 18:41:12,553 - INFO - QR Code detected with URL: https://www.cybersecurityhub101.com/
+2024-10-28 18:41:13,191 - INFO - Checked URL: https://www.cybersecurityhub101.com/, Verdict: URL 'https://www.cybersecurityhub101.com/' appears safe.
+2024-10-28 18:41:13,569 - INFO - Checked URL: https://www.cybersecurityhub101.com/, Verdict: URL 'https://www.cybersecurityhub101.com/' appears safe.
+2024-10-28 18:41:13,570 - INFO - Found attachment: 2024-10-28 18_38_13-QR Code Generator _ Create Your Free QR Codes.png
+2024-10-28 18:41:13,571 - INFO - Possible Fake Invoice scam not detected.
+2024-10-28 18:41:13,571 - INFO - No phishing indicators found for the specific set of keywords.
